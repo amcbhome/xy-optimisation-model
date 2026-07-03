@@ -1,230 +1,79 @@
-"""
-app.py
-
-X,Y Optimisation Model
-Single-screen Streamlit application
-
-Focus:
-- Algebraic formulation
-- Graphical feasible region
-- Optimal solution interpretation
-"""
-
 import streamlit as st
 
-from solver import solve_model
+from model import LPModel, Constraint
+from solver import solve
+from geometry import build_geometry
 from plotter import build_plot
 
 
-# ------------------------------------------------------------
-# PAGE CONFIG
-# ------------------------------------------------------------
-
-st.set_page_config(
-    page_title="X,Y Optimisation Model",
-    layout="wide"
-)
+st.set_page_config(layout="wide")
 
 st.title("X,Y Optimisation Model")
-st.caption("An educational graphical linear programming tool (2 variables only)")
 
 
-# ------------------------------------------------------------
-# SESSION STATE (DEFAULT MODEL)
-# ------------------------------------------------------------
+# ---------------------------
+# INPUTS
+# ---------------------------
 
-if "constraints" not in st.session_state:
-    st.session_state.constraints = [
-        [1, 1, "<=", 40],
-        [2, 1, "<=", 60],
-        [1, 0, "<=", 30],
-        [0, 1, "<=", 20],
-    ]
+cx = st.number_input("Objective x coefficient", value=40)
+cy = st.number_input("Objective y coefficient", value=30)
 
+maximise = st.radio("Objective", ["Maximise", "Minimise"]) == "Maximise"
 
-# ------------------------------------------------------------
-# LAYOUT: TWO PANELS
-# ------------------------------------------------------------
 
-left, right = st.columns([1, 2])
+constraints = []
 
+st.subheader("Constraints")
 
-# ============================================================
-# LEFT PANEL: MODEL INPUT + ALGEBRA
-# ============================================================
+for i in range(4):
 
-with left:
+    col1, col2, col3, col4 = st.columns(4)
 
-    st.subheader("Build the Model")
+    ax = col1.number_input(f"x{i}", value=1.0, key=f"ax{i}")
+    ay = col2.number_input(f"y{i}", value=1.0, key=f"ay{i}")
+    rel = col3.selectbox(f"rel{i}", ["<=", ">=", "="], key=f"rel{i}")
+    rhs = col4.number_input(f"rhs{i}", value=40.0, key=f"rhs{i}")
 
-    # -------------------------
-    # Objective
-    # -------------------------
+    constraints.append(Constraint(ax, ay, rel, rhs))
 
-    st.markdown("### Objective Function")
 
-    maximise = st.radio(
-        "Type",
-        ["Maximise", "Minimise"]
-    )
+# ---------------------------
+# BUILD MODEL
+# ---------------------------
 
-    cx = st.number_input("Coefficient of x", value=40)
-    cy = st.number_input("Coefficient of y", value=30)
+model = LPModel(
+    objective=(cx, cy),
+    maximise=maximise,
+    constraints=constraints
+)
 
-    # -------------------------
-    # Constraints
-    # -------------------------
 
-    st.markdown("### Constraints")
+if st.button("Solve"):
 
-    constraints = []
+    solution = solve(model)
+    geometry = build_geometry(model)
 
-    for i, c in enumerate(st.session_state.constraints):
+    fig = build_plot(geometry, solution, model)
 
-        st.markdown(f"**Constraint {i+1}**")
+    # -----------------------
+    # OUTPUTS
+    # -----------------------
 
-        col1, col2, col3, col4 = st.columns(4)
+    st.subheader("Algebraic Model")
 
-        ax = col1.number_input(
-            "x",
-            value=float(c[0]),
-            key=f"ax_{i}"
-        )
+    st.code(f"""
+Z = {cx}x + {cy}y
 
-        ay = col2.number_input(
-            "y",
-            value=float(c[1]),
-            key=f"ay_{i}"
-        )
+Constraints:
+""" + "\n".join(
+        [f"{c.ax}x + {c.ay}y {c.relation} {c.rhs}" for c in constraints]
+    ))
 
-        rel = col3.selectbox(
-            "Rel",
-            ["<=", ">=", "="],
-            index=["<=", ">=", "="].index(c[2]),
-            key=f"rel_{i}"
-        )
+    col1, col2 = st.columns(2)
 
-        rhs = col4.number_input(
-            "RHS",
-            value=float(c[3]),
-            key=f"rhs_{i}"
-        )
+    with col1:
+        st.subheader("Solution")
+        st.write(solution)
 
-        constraints.append([ax, ay, rel, rhs])
-
-    st.session_state.constraints = constraints
-
-    # -------------------------
-    # Solve button
-    # -------------------------
-
-    st.markdown("---")
-
-    solve = st.button("Build & Solve Model", type="primary")
-
-
-# ============================================================
-# RIGHT PANEL: GRAPH
-# ============================================================
-
-with right:
-
-    st.subheader("Graphical Solution")
-
-    fig_placeholder = st.empty()
-
-
-# ============================================================
-# BOTTOM: ALGEBRAIC MODEL + RESULTS
-# ============================================================
-
-st.markdown("---")
-
-model_col, result_col = st.columns(2)
-
-
-# ------------------------------------------------------------
-# RUN MODEL
-# ------------------------------------------------------------
-
-if solve:
-
-    objective = (cx, cy)
-
-    maximise_flag = maximise == "Maximise"
-
-    result = solve_model(
-        objective=objective,
-        constraints=constraints,
-        maximise=maximise_flag
-    )
-
-    # --------------------------------------------------------
-    # ALGEBRAIC MODEL
-    # --------------------------------------------------------
-
-    with model_col:
-
-        st.subheader("Algebraic Model")
-
-        st.code(
-            f"""
-{maximise} Z = {cx}x + {cy}y
-
-Subject to
-
-""" +
-"\n".join(
-    [f"{a}x + {b}y {r} {rhs}" for a, b, r, rhs in constraints]
-) +
-"""
-
-x ≥ 0
-y ≥ 0
-""",
-            language="text"
-        )
-
-    # --------------------------------------------------------
-    # PLOT
-    # --------------------------------------------------------
-
-    geometry_placeholder = {
-        "vertices": [],  # geometry.py would normally supply this
-        "limits": (50, 50),
-    }
-
-    fig = build_plot(
-        geometry=geometry_placeholder,
-        solution=result,
-        constraints=constraints
-    )
-
-    fig_placeholder.plotly_chart(fig, use_container_width=True)
-
-    # --------------------------------------------------------
-    # RESULTS
-    # --------------------------------------------------------
-
-    with result_col:
-
-        st.subheader("Optimal Solution")
-
-        st.markdown(f"**x = {result['x']:.2f}**")
-        st.markdown(f"**y = {result['y']:.2f}**")
-        st.markdown(f"**Z = {result['objective_value']:.2f}**")
-
-        st.markdown("---")
-
-        st.subheader("Active Constraints")
-
-        if result["active_constraints"]:
-            for c in result["active_constraints"]:
-                st.write(c)
-        else:
-            st.write("None identified")
-
-else:
-
-    with model_col:
-        st.info("Click 'Build & Solve Model' to generate algebraic and graphical solution.")
+    with col2:
+        st.plotly_chart(fig, use_container_width=True)
