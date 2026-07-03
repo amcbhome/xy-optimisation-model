@@ -13,45 +13,52 @@ from pulp import (
 )
 
 # ------------------------------------------------------------
-# PAGE SETUP
+# PAGE CONFIG
 # ------------------------------------------------------------
 
 st.set_page_config(page_title="X,Y Optimisation Tool", layout="wide")
 st.title("X,Y Optimisation Model")
-st.caption("Single-file linear programming visualisation tool")
+st.caption("Graphical linear programming decision tool")
 
 # ------------------------------------------------------------
-# INPUTS
+# SIDEBAR INPUTS
 # ------------------------------------------------------------
 
-col1, col2 = st.columns(2)
+st.sidebar.header("Objective Function")
 
-with col1:
-    st.subheader("Objective Function")
-    cx = st.number_input("Coefficient of x", value=40.0)
-    cy = st.number_input("Coefficient of y", value=30.0)
-    maximise = st.radio("Type", ["Maximise", "Minimise"]) == "Maximise"
+cx = st.sidebar.number_input("Coefficient of x", value=30.0)
+cy = st.sidebar.number_input("Coefficient of y", value=40.0)
 
-with col2:
-    st.subheader("Constraints")
+maximise = st.sidebar.radio("Optimisation", ["Maximise", "Minimise"]) == "Maximise"
+
+st.sidebar.divider()
+st.sidebar.header("Constraints (2 max)")
 
 constraints = []
 
-for i in range(4):
-    c1, c2, c3, c4 = st.columns(4)
+for i in range(2):
 
-    ax = c1.number_input(f"x{i+1}", value=1.0, key=f"ax{i}")
-    ay = c2.number_input(f"y{i+1}", value=1.0, key=f"ay{i}")
-    rel = c3.selectbox(f"rel{i+1}", ["<=", ">=", "="], key=f"rel{i}")
-    rhs = c4.number_input(f"rhs{i+1}", value=40.0, key=f"rhs{i}")
+    st.sidebar.subheader(f"Constraint {i+1}")
 
-    constraints.append((ax, ay, rel, rhs))
+    label = st.sidebar.text_input(
+        f"Label {i+1}",
+        value="Labour" if i == 0 else "Material",
+        key=f"label{i}"
+    )
+
+    ax = st.sidebar.number_input(f"{label} - x coefficient", value=1.0, key=f"ax{i}")
+    ay = st.sidebar.number_input(f"{label} - y coefficient", value=1.0, key=f"ay{i}")
+
+    rhs = st.sidebar.number_input(f"{label} - limit", value=100.0, key=f"rhs{i}")
+
+    constraints.append((label, ax, ay, rhs))
 
 # ------------------------------------------------------------
-# SOLVER (PuLP)
+# SOLVER
 # ------------------------------------------------------------
 
 def solve_lp():
+
     sense = LpMaximize if maximise else LpMinimize
     model = LpProblem("XY_Model", sense)
 
@@ -60,15 +67,8 @@ def solve_lp():
 
     model += cx * x + cy * y
 
-    for i, (ax, ay, rel, rhs) in enumerate(constraints):
-        expr = ax * x + ay * y
-
-        if rel == "<=":
-            model += expr <= rhs
-        elif rel == ">=":
-            model += expr >= rhs
-        else:
-            model += expr == rhs
+    for label, ax, ay, rhs in constraints:
+        model += ax * x + ay * y <= rhs, label
 
     model.solve(PULP_CBC_CMD(msg=False))
 
@@ -79,67 +79,64 @@ def solve_lp():
         "status": LpStatus[model.status],
     }
 
-
 # ------------------------------------------------------------
-# FEASIBLE REGION (GRID APPROXIMATION)
+# FEASIBLE REGION (SIMPLE VISUAL APPROX)
 # ------------------------------------------------------------
 
-def build_feasible_region(x_max=50, y_max=50):
-    grid = np.linspace(0, x_max, 40)
+def feasible_region(x_max=100, y_max=100):
+
+    grid = np.linspace(0, x_max, 60)
     points = []
 
     for x in grid:
         for y in grid:
+
             ok = True
 
-            for ax, ay, rel, rhs in constraints:
-                val = ax * x + ay * y
+            for _, ax, ay, rhs in constraints:
 
-                if rel == "<=" and val > rhs + 1e-6:
-                    ok = False
-                if rel == ">=" and val < rhs - 1e-6:
-                    ok = False
-                if rel == "=" and abs(val - rhs) > 1e-6:
+                if ax * x + ay * y > rhs:
                     ok = False
 
             if ok:
                 points.append((x, y))
 
     if len(points) < 3:
-        return [], (x_max, y_max)
+        return np.array([]), (x_max, y_max)
 
     pts = np.array(points)
 
-    x_max = max(pts[:, 0]) * 1.1
-    y_max = max(pts[:, 1]) * 1.1
-
-    return pts, (x_max, y_max)
-
+    return pts, (pts[:,0].max()*1.1, pts[:,1].max()*1.1)
 
 # ------------------------------------------------------------
-# PLOTTER
+# PLOT
 # ------------------------------------------------------------
 
-def plot_graph(solution, region, limits):
+def plot(solution, region, limits):
+
     fig = go.Figure()
 
     x_max, y_max = limits
     x_range = np.linspace(0, x_max, 300)
 
     # constraints
-    for i, (ax, ay, rel, rhs) in enumerate(constraints):
+    for i, (label, ax, ay, rhs) in enumerate(constraints):
 
         if ay != 0:
             y = (rhs - ax * x_range) / ay
-            fig.add_trace(go.Scatter(x=x_range, y=y, mode="lines", name=f"C{i+1}"))
+
+            fig.add_trace(go.Scatter(
+                x=x_range,
+                y=y,
+                mode="lines",
+                name=label
+            ))
 
     # feasible region
     if len(region) > 0:
-        vx, vy = region[:, 0], region[:, 1]
-
         fig.add_trace(go.Scatter(
-            x=vx,
-            y=vy,
+            x=region[:,0],
+            y=region[:,1],
             mode="markers",
             marker=dict(size=3),
             name="Feasible Region"
@@ -152,13 +149,12 @@ def plot_graph(solution, region, limits):
         mode="markers+text",
         marker=dict(size=12, color="red"),
         text=["OPT"],
-        name="Optimal"
+        name="Optimal Solution"
     ))
 
     fig.update_layout(
         title="Feasible Region & Optimal Solution",
         template="simple_white",
-        width=900,
         height=650
     )
 
@@ -167,7 +163,6 @@ def plot_graph(solution, region, limits):
 
     return fig
 
-
 # ------------------------------------------------------------
 # RUN
 # ------------------------------------------------------------
@@ -175,23 +170,27 @@ def plot_graph(solution, region, limits):
 if st.button("Solve Model"):
 
     sol = solve_lp()
-    region, limits = build_feasible_region()
-    fig = plot_graph(sol, region, limits)
+    region, limits = feasible_region()
+    fig = plot(sol, region, limits)
 
-    st.subheader("Algebraic Model")
+    # LEFT: algebra
+    col1, col2 = st.columns(2)
 
-    st.code(f"""
+    with col1:
+        st.subheader("Algebraic Model")
+
+        st.code(f"""
 Max Z = {cx}x + {cy}y
 
 Subject to:
-""" + "\n".join(
-        [f"{a}x + {b}y {r} {rhs}" for a, b, r, rhs in constraints]
-    ))
+""" + "\n".join([
+    f"{label}: {ax}x + {ay}y ≤ {rhs}"
+    for label, ax, ay, rhs in constraints
+]))
 
-    colA, colB = st.columns(2)
-
-    with colA:
         st.write(sol)
 
-    with colB:
+    # RIGHT: graph
+    with col2:
+        st.subheader("Graphical Solution")
         st.plotly_chart(fig, use_container_width=True)
