@@ -50,7 +50,7 @@ st.markdown("""
     div[data-baseweb="input"] input, div[data-baseweb="number-input"] input {
         font-size: 1.5rem !important;
         font-weight: 700 !important;
-        padding: 0.75rem 0.5rem !important; /* Safe padding instead of forced heights */
+        padding: 0.75rem 0.5rem !important; /* Safe padding */
         border-radius: 8px !important;
     }
 
@@ -95,31 +95,37 @@ with col_obj:
     st.subheader("1. Objective Function")
     
     c1, c2 = st.columns([1, 2])
-    opt_type = c1.radio("Goal", ["Maximise", "Minimise"])
+    # Collapsed label for cleaner alignment
+    opt_type = c1.radio("Goal", ["Maximise", "Minimise"], label_visibility="collapsed")
     maximise = opt_type == "Maximise"
-    obj_label = c2.text_input("Objective Label", value="Profit")
+    
+    # Collapsed label, utilizing placeholder
+    obj_label = c2.text_input("Objective Label", value="Profit", placeholder="Enter objective label...", label_visibility="collapsed")
+    
+    st.write("") # Small spacer
     
     c3, c4 = st.columns(2)
-    x_label = c3.text_input("Variable 1 Label", value="Product A")
-    cx = c3.number_input(f"{x_label} Coefficient", value=30.0, step=1.0)
+    # Collapsed labels, utilizing placeholders
+    x_label = c3.text_input("Variable 1", value="Product A", placeholder="Enter Var 1 label...", label_visibility="collapsed")
+    cx = c3.number_input(f"{x_label if x_label else 'Var 1'} Coefficient", value=30.0, step=1.0)
     
-    y_label = c4.text_input("Variable 2 Label", value="Product B")
-    cy = c4.number_input(f"{y_label} Coefficient", value=40.0, step=1.0)
+    y_label = c4.text_input("Variable 2", value="Product B", placeholder="Enter Var 2 label...", label_visibility="collapsed")
+    cy = c4.number_input(f"{y_label if y_label else 'Var 2'} Coefficient", value=40.0, step=1.0)
 
 with col_cons:
     st.subheader("2. Constraints")
     
     h1, h2, h3, h4 = st.columns([1.5, 1, 1, 1])
     h1.caption("Constraint Name")
-    h2.caption(f"{x_label} Coeff")
-    h3.caption(f"{y_label} Coeff")
+    h2.caption(f"{x_label if x_label else 'Var 1'} Coeff")
+    h3.caption(f"{y_label if y_label else 'Var 2'} Coeff")
     h4.caption("Limit (≤)")
     
     constraints = []
     
     for i in range(2):
         r1, r2, r3, r4 = st.columns([1.5, 1, 1, 1])
-        c_label = r1.text_input("Name", value="Labour" if i == 0 else "Material", key=f"l_{i}", label_visibility="collapsed")
+        c_label = r1.text_input("Name", value="Labour" if i == 0 else "Material", placeholder="Constraint name...", key=f"l_{i}", label_visibility="collapsed")
         
         default_ax = 4.0 if i == 0 else 3.0
         default_ay = 4.0 if i == 0 else 5.0
