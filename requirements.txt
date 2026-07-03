@@ -1,6 +1,4 @@
 streamlit
-pulp
-plotly
 numpy
-pandas
-scipy
+plotly
+pulp
