@@ -14,85 +14,95 @@ from pulp import (
 # ------------------------------------------------------------
 st.set_page_config(page_title="X,Y Optimisation Calculator", layout="wide")
 
-# CSS to make every input field, button, and the output screen MASSIVE and calculator-like.
+# CSS to fix contrast, force readable colors, enlarge text, and fix text alignment
 st.markdown("""
     <style>
     /* GLOBAL OVERRIDES */
     html, body, [data-testid="stAppViewContainer"] {
-        background-color: #f0f2f6;
+        background-color: #f4f6f9 !important;
     }
     
-    /* ENLARGE HEADERS */
-    h1 { font-size: 4rem !important; font-weight: 800 !important; color: #1a1c23 !important; margin-bottom: 0.2rem !important;}
-    p.stCaption { font-size: 1.5rem !important; font-weight: 500 !important; color: #4c566a !important; }
-    h3 { font-size: 2.2rem !important; font-weight: 700 !important; color: #2e3440 !important; margin-top: 1.5rem !important;}
+    /* ENLARGE AND COLOR HEADERS */
+    h1 { font-size: 3.5rem !important; font-weight: 800 !important; color: #111827 !important; margin-bottom: 0.2rem !important;}
+    p.stCaption { font-size: 1.2rem !important; font-weight: 500 !important; color: #64748b !important; }
+    h3 { font-size: 2rem !important; font-weight: 700 !important; color: #1f2937 !important; margin-top: 1.5rem !important;}
 
-    /* STYLE AND ENLARGE ALL INPUT FIELDS (Number, Text, Select) */
-    div[data-baseweb="input"] input, div[data-baseweb="number-input"] input, div[data-baseweb="select"] {
-        font-size: 1.8rem !important;
-        font-weight: 700 !important;
-        height: 3.5rem !important;
-        border-radius: 10px !important;
-        border: 2px solid #d8dee9 !important;
-    }
+    /* FIX STANDARD LABELS & CAPTIONS FOR READABILITY */
     label[data-testid="stWidgetLabel"] p {
-        font-size: 1.2rem !important;
+        font-size: 1.1rem !important;
         font-weight: 600 !important;
-        color: #4c566a !important;
+        color: #334155 !important;
     }
-    
+    div[data-testid="stCaptionContainer"] p {
+        color: #475569 !important;
+        font-size: 1rem !important;
+        font-weight: 700 !important;
+    }
+
     /* ENLARGE RADIO BUTTONS */
     div[data-testid="stRadio"] label p {
-        font-size: 1.4rem !important;
+        font-size: 1.2rem !important;
         font-weight: 600 !important;
+        color: #111827 !important;
     }
 
-    /* MASSIVE CALCULATE BUTTON */
+    /* STYLE, ENLARGE, AND ALIGN ALL INPUT FIELDS */
+    div[data-baseweb="input"] input, div[data-baseweb="number-input"] input {
+        font-size: 1.6rem !important;
+        font-weight: 700 !important;
+        height: 3.5rem !important;
+        line-height: 3.5rem !important; /* Vertically centers the text */
+        padding-top: 0 !important;      /* Overrides Streamlit's default padding */
+        padding-bottom: 0 !important;   /* Overrides Streamlit's default padding */
+        border-radius: 8px !important;
+    }
+
+    /* MASSIVE CALCULATE BUTTON & TEXT */
     div.stButton > button:first-child {
         height: 4.5em !important;
+        border-radius: 12px !important;
+        background-color: #ff4b4b !important;
+        border: none !important;
+        box-shadow: 0px 8px 15px rgba(0,0,0,0.15) !important;
+        transition: all 0.3s ease 0s !important;
+    }
+    /* Target the text inside the button specifically */
+    div.stButton > button:first-child p {
         font-size: 2rem !important;
         font-weight: 800 !important;
-        border-radius: 15px !important;
-        background-color: #ff4b4b !important;
-        color: white !important;
-        border: none !important;
-        box-shadow: 0px 8px 15px rgba(0,0,0,0.2) !important;
-        transition: all 0.3s ease 0s !important;
+        color: #ffffff !important;
+        margin: 0 !important;
     }
     div.stButton > button:first-child:hover {
         background-color: #ff3333 !important;
-        box-shadow: 0px 15px 20px rgba(0,0,0,0.3) !important;
-        transform: translateY(-3px) !important;
+        transform: translateY(-2px) !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------------------
-# LOGO AND TITLE (Top Left in Sidebar to save space)
+# LOGO AND TITLE 
 # ------------------------------------------------------------
 with st.sidebar:
-    st.image("https://img.icons8.com/plasticine/200/calculator.png", width=150) # Calculator icon
+    st.image("https://img.icons8.com/plasticine/200/calculator.png", width=150)
     st.divider()
 
-# Main Title and Caption
 st.title("🧮 X, Y Optimisation Calculator")
 st.caption("A streamlined linear programming solver using PuLP")
 
 # ------------------------------------------------------------
-# COMPACT UI LAYOUT (Side-by-side)
+# COMPACT UI LAYOUT
 # ------------------------------------------------------------
 col_obj, col_cons = st.columns(2, gap="large")
 
 with col_obj:
     st.subheader("1. Objective Function")
     
-    # Goal and Objective Name
     c1, c2 = st.columns([1, 2])
     opt_type = c1.radio("Goal", ["Maximise", "Minimise"])
     maximise = opt_type == "Maximise"
     obj_label = c2.text_input("Objective Label", value="Profit")
     
-    # Decision Variables and Coefficients
     c3, c4 = st.columns(2)
     x_label = c3.text_input("Variable 1 Label", value="Product A")
     cx = c3.number_input(f"{x_label} Coefficient", value=30.0, step=1.0)
@@ -103,7 +113,6 @@ with col_obj:
 with col_cons:
     st.subheader("2. Constraints")
     
-    # Column headers for visual alignment
     h1, h2, h3, h4 = st.columns([1.5, 1, 1, 1])
     h1.caption("Constraint Name")
     h2.caption(f"{x_label} Coeff")
@@ -112,11 +121,10 @@ with col_cons:
     
     constraints = []
     
-    # Compact constraint rows
     for i in range(2):
         r1, r2, r3, r4 = st.columns([1.5, 1, 1, 1])
         c_label = r1.text_input("Name", value="Labour" if i == 0 else "Material", key=f"l_{i}", label_visibility="collapsed")
-        # Initialize number inputs with values matching your screenshot example
+        
         default_ax = 4.0 if i == 0 else 3.0
         default_ay = 4.0 if i == 0 else 5.0
         default_rhs = 16000.0 if i == 0 else 15000.0
@@ -150,14 +158,10 @@ if solve_btn:
     status = LpStatus[model.status]
 
     if status == "Optimal":
-        # Extract values
         opt_x = value(x) if value(x) is not None else 0.0
         opt_y = value(y) if value(y) is not None else 0.0
         opt_z = value(model.objective) if value(model.objective) is not None else 0.0
         
-        # --------------------------------------------------------
-        # CUSTOM HTML GIANT LCD SCREEN OUTPUT
-        # --------------------------------------------------------
         lcd_html = f"""
         <div style="background-color: #1a1c23; border: 8px solid #2e3440; border-radius: 15px; padding: 40px; text-align: center; box-shadow: inset 0px 0px 25px rgba(0,0,0,0.8); margin-top: 10px;">
             <p style="font-size: 1.5rem; color: #8892b0; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 3px; font-family: 'Segoe UI', sans-serif; font-weight: 600;">Calculated {obj_label}</p>
